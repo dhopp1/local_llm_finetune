@@ -19,11 +19,12 @@ def split_text_file(file_path, chunk_size, overlap_size):
 
 def process_data(
     metadata,
-    llm,
-    model,
     chunk_size,
     overlap_size,
     prompt_format="This is an excerpt from the document with the the following metadata: {}. It is currently about 500 words long. Summarize the information to about 100 words, keeping special note of key figures, statistics, and policy recommendations made. Here is the excerpt: '{}'",
+    llm=None,
+    model=None,
+    completion_ratio=0.75,
 ):
     "process a corpus into a dataset"
 
@@ -47,19 +48,42 @@ def process_data(
         {
             "query": [
                 prompt_format.format(meta[j], chunks[j]) for j in range(len(meta))
+            ]
+            if llm != None
+            else [
+                prompt_format.format(
+                    meta[j],
+                    " ".join(
+                        chunks[j].split(" ")[
+                            : int(len(chunks[j].split(" ")) * completion_ratio)
+                        ]
+                    ),
+                )
+                for j in range(len(meta))
             ],
-            "response": "",
+            "response": ""
+            if llm != None
+            else [
+                " ".join(
+                    chunks[j].split(" ")[
+                        int(len(chunks[j].split(" ")) * completion_ratio) :
+                    ]
+                )
+                for j in range(len(meta))
+            ],
         }
     )
 
-    for i in range(len(dataset)):
-        print(f"generating responses {i}/{len(dataset)}")
-        response = model.gen_response(
-            prompt=dataset.loc[i, "query"],
-            llm=llm,
-            use_chat_engine=False,
-        )
-        dataset.loc[i, "response"] = response["response"]
+    # LLM generated
+    if llm != None:
+        for i in range(len(dataset)):
+            print(f"generating responses {i}/{len(dataset)}")
+            response = model.gen_response(
+                prompt=dataset.loc[i, "query"],
+                llm=llm,
+                use_chat_engine=False,
+            )
+            dataset.loc[i, "response"] = response["response"]
 
     return dataset
 
