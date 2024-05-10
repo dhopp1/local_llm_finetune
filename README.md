@@ -45,4 +45,43 @@ finetune = finetuner(
     metadata_path="container_path_to_metadata/metadata.csv",
     prompt_format="This is an excerpt from the document with the the following metadata: {}. It is currently about 750 words long. Complete the excerpt with a new text about one third as long. Here is the excerpt: '{}'",
 )
+
+# prepare the dataset
+finetune.prepare_dataset("container_path_out/dataset.csv")
+```
+
+## Fine-tuning a model
+```py
+import pandas as pd
+from local_llm_finetune.finetuner import finetuner
+
+# assuming you created a dataset.csv file in the previous step. If you're in the same script as from above, finetuner.dataset will be created via the finetuner.prepare_dataset function, no need to reinstantiate
+dataset = pd.read_csv("dataset.csv")
+
+finetune = finetuner(
+    dataset = dataset,
+)
+
+# initialize the base model to be fine-tuned
+finetune.initialize_model(
+    base_model_name="unsloth/llama-3-8b-Instruct-bnb-4bit",
+)
+
+# format the training data
+finetune.format_training_data(
+    input_split = "Here is the excerpt:", # how to split the 'query' string of the data, in case you want the first part to go into the 'instruction' section of the alpaca prompt, and the second part to go into the 'input' section. If not passed, all the text in the 'query' column will go into the 'instruction' section
+)
+
+# setup the trainer
+finetune.setup_training(
+    output_dir="full_model", # where to save the full, unquantized model
+)
+
+# train the model
+finetune.train()
+
+# save the model to GGUF
+finetune.save_model(
+    output_dir="gguf_model", # where to save the GGUF
+)
 ```

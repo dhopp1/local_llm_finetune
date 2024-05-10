@@ -40,6 +40,7 @@ class finetuner:
         dataset=None,
     ):
         self.data_prep = import_module("local_llm_finetune.data_prep")
+        self.modelling = import_module("local_llm_finetune.modelling")
 
         self.metadata_path = metadata_path
         self.llm_path = llm_path
@@ -111,3 +112,126 @@ class finetuner:
         # write the dataset out
         if dataset_out_path != None:
             self.dataset.to_csv(dataset_out_path, index=False)
+
+    def initialize_model(
+        self,
+        base_model_name="unsloth/llama-3-8b-Instruct-bnb-4bit",
+        max_seq_length=2048,
+        dtype=None,
+        load_in_4bit=True,
+        r=16,
+        target_modules=[
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
+        ],
+        lora_alpha=16,
+        lora_dropout=0,
+        bias="none",
+        use_gradient_checkpointing="unsloth",
+        random_state=0,
+        use_rslora=False,
+        loftq_config=None,
+    ):
+        """Initialize an unsloth model to be trained. See unsloth documentation for hyperparameter explanations.
+        parameters:
+            :base_model_name: str: HuggingFace name of base model to be fine-tuned. Additional options at: https://huggingface.co/unsloth
+        """
+
+        (
+            self.unsloth_model,
+            self.tokenizer,
+            self.max_seq_length,
+        ) = self.modelling.initialize_model(
+            base_model_name=base_model_name,
+            max_seq_length=max_seq_length,
+            dtype=dtype,
+            load_in_4bit=load_in_4bit,
+            r=r,
+            target_modules=target_modules,
+            lora_alpha=lora_alpha,
+            lora_dropout=lora_dropout,
+            bias=bias,
+            use_gradient_checkpointing=use_gradient_checkpointing,
+            random_state=random_state,
+            use_rslora=use_rslora,
+            loftq_config=loftq_config,
+        )
+
+    def format_training_data(
+        self,
+        prompt_format=None,
+        input_split=None,
+    ):
+        """Format a dataset into the format necessary for unsloth.
+        parameters:
+            :prompt_format: str: Prompt format of training samples, alpaca by default
+            :input_split: str: If you would like to split the "query" column of your dataset into two separate "instruction" and "input" sections, pass a string that separates those two sections. If not passed, the entire "query" string will go into the "instruction" section of the prompt.
+        """
+
+        self.train_dataset = self.modelling.format_training_data(
+            tokenizer=self.tokenizer,
+            dataset=self.dataset,
+            prompt_format=prompt_format,
+            input_split=input_split,
+        )
+
+    def setup_training(
+        self,
+        dataset_num_proc=2,
+        packing=False,
+        per_device_train_batch_size=2,
+        gradient_accumulation_steps=4,
+        warmup_steps=5,
+        max_steps=60,
+        learning_rate=2e-4,
+        fp16=not torch.cuda.is_bf16_supported(),
+        bf16=torch.cuda.is_bf16_supported(),
+        logging_steps=1,
+        optim="adamw_8bit",
+        weight_decay=0.01,
+        lr_scheduler_type="linear",
+        seed=0,
+        output_dir="outputs",
+    ):
+        """Setup the unsloth trainer. See unsloth documentation for explanation of parameters."""
+
+        self.trainer = self.modelling.setup_training(
+            unsloth_model=self.unsloth_model,
+            tokenizer=self.tokenizer,
+            train_dataset=self.train_dataset,
+            max_seq_length=self.max_seq_length,
+            dataset_num_proc=dataset_num_proc,
+            packing=packing,
+            per_device_train_batch_size=per_device_train_batch_size,
+            gradient_accumulation_steps=gradient_accumulation_steps,
+            warmup_steps=warmup_steps,
+            max_steps=max_steps,
+            learning_rate=learning_rate,
+            fp16=fp16,
+            bf16=bf16,
+            logging_steps=logging_steps,
+            optim=optim,
+            weight_decay=weight_decay,
+            lr_scheduler_type=lr_scheduler_type,
+            seed=seed,
+            output_dir=output_dir,
+        )
+
+    def train(self):
+        "fine-tune the model"
+        self.trainer_stats = self.trainer.train()
+
+    def save_model(self, quantization_method="q5_k_m", output_dir="trained_model"):
+        """Save the fine-tuned model to disk
+        parameters:
+            :quantization_method: str: Quantization method for compressing the model to GGUF
+            :output_dir: str: Where to save the trained model
+        """
+        self.unsloth_model.save_pretrained_gguf(
+            output_dir, self.tokenizer, quantization_method
+        )

@@ -29,3 +29,6 @@ RUN pip install llama-cpp-python
 # install local_rag_llm for synthetic datasets
 RUN pip install -r https://raw.githubusercontent.com/dhopp1/local_rag_llm/main/requirements.txt
 RUN pip install local-rag-llm
+
+# install local_llm_finetune
+RUN pip install local_llm_finetune
