@@ -2,7 +2,7 @@ import pandas as pd
 import re
 
 
-def split_text_file(file_path, chunk_size, overlap_size):
+def split_text_file(file_path, chunk_size, chunk_overlap):
     "split a text file into chunks"
     with open(file_path, "r") as f:
         text = f.read()
@@ -10,7 +10,7 @@ def split_text_file(file_path, chunk_size, overlap_size):
     words = re.split(" ", text)
     chunks = []
 
-    for i in range(0, len(words), chunk_size - overlap_size):
+    for i in range(0, len(words), chunk_size - chunk_overlap):
         chunk = " ".join(words[i : i + chunk_size])
         chunks.append(chunk)
 
@@ -20,7 +20,7 @@ def split_text_file(file_path, chunk_size, overlap_size):
 def process_data(
     metadata,
     chunk_size,
-    overlap_size,
+    chunk_overlap,
     prompt_format="This is an excerpt from the document with the the following metadata: {}. It is currently about 500 words long. Summarize the information to about 100 words, keeping special note of key figures, statistics, and policy recommendations made. Here is the excerpt: '{}'",
     llm=None,
     model=None,
@@ -39,7 +39,7 @@ def process_data(
                     " | " if col != metadata.columns[-1] else ""
                 )
         tmp_chunks = split_text_file(
-            metadata.loc[i, "filepath"], chunk_size, overlap_size
+            metadata.loc[i, "filepath"], chunk_size, chunk_overlap
         )
         chunks += tmp_chunks
         meta += [meta_string] * len(tmp_chunks)
