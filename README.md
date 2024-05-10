@@ -74,7 +74,7 @@ finetune.format_training_data(
 
 # setup the trainer
 finetune.setup_training(
-    output_dir="full_model", # where to save the full, unquantized model
+    output_dir="finetuned_model", # where to save the full, unquantized model
 )
 
 # train the model
@@ -82,6 +82,6 @@ finetune.train()
 
 # save the model to GGUF
 finetune.save_model(
-    output_dir="gguf_model", # where to save the GGUF
+    output_dir="finetuned_model", # where to save the full, unquantized model, GGUFs will be saved at the same level as this directory
 )
 ```
