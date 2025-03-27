@@ -1,2 +1,7 @@
+datasets
 openai
 pandas
+torch
+transformers
+trl
+unsloth
